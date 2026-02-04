@@ -17,7 +17,7 @@ This project builds a clean, BI‑ready table `user_base` in BigQuery by:
 
 ## Model layers
 
-* **staging** (optional/omitted here for brevity): thin cleans of raw sources
+* **staging**: thin cleans of raw sources
 * **intermediate**: reusable transforms and joins
 
   * `intermediate/locations_clean.sql` — one row per `from_location_id` with `city/county/state/country` + coordinates
@@ -81,7 +81,7 @@ models:
 
 * `not_null` on `user_id`
 * `dbt_utils.unique_combination_of_columns` on `(user_id, partner_id, site_id)`
-  Add staging tests (e.g., `unique`/`not_null` on natural keys) as needed.
+  Will add staging tests (e.g., `unique`/`not_null` on natural keys) as needed.
 
 ## Build & run
 
