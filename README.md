@@ -1,4 +1,4 @@
-# user\_base\_project — dbt + BigQuery
+# dbt User 360 Pipeline in BigQuery
 
 ## Overview
 
