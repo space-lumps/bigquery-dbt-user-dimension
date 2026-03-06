@@ -1,15 +1,26 @@
+# models/marts/marts_schema.yml
+
 version: 2
 models:
-  - name: user_base
-    description: "One row per user + (optional) partner/site with resolved location fields"
+  - name: dim_users
+    description: "One row per user + (optional) sponsor/site with resolved location fields"
     columns:
       - name: user_id
+        description: "Primary key — unique identifier for each user"
         tests: [not_null]
-      - name: partner_id
+      - name: sponsor_id
+        description: "ID of the sponsoring entity (null if user has no sponsor)"
       - name: site_id
+        description: "ID of the associated site/location (null if not applicable)"
       - name: city
+        description: "Resolved city name based on user's most reliable location source"
       - name: state
+        description: "Resolved state/province/region code or name"
       - name: country
+        description: "Resolved ISO 3166-1 alpha-2 country code (e.g., 'US', 'CA')"
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [user_id, partner_id, site_id]
+          arguments:
+            combination_of_columns: [user_id, sponsor_id, site_id]
+            # Ensures no duplicate rows when sponsor/site context is considered
+            # Nested under 'arguments' to comply with dbt >=1.8 deprecation rules

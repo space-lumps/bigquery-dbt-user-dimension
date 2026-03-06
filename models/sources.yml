@@ -1,20 +1,33 @@
+# models/sources.yml
+# 
+# Declares all raw source tables referenced by the dbt models.
+# Names are fully genericized (no proprietary identifiers) for this portfolio showcase.
+# Real production data is not included or accessible here — this is for demonstration only.
+
 version: 2
+
 sources:
   - name: raw
-    database: oroboro-dw
-    schema: bronze_raw
+    database: sample_user_warehouse          # Placeholder BigQuery project ID
+    schema: bronze_raw                       # Placeholder raw layer schema
     tables:
-      - name: user_user
-      - name: educator_classroomlearnermembership
-      - name: educator_classroom
-      - name: educator_classroom_educators
-      - name: educator_classroominvitation
-      - name: educator_classroominvitecode
+      # Core user and identity tables
+      - name: user_core
+      - name: user_join_record
       - name: user_site
-      - name: user_partner
-      - name: user_partnerinvitecode
-      - name: action_userjoinsaction
-      - name: location_location
-      - name: location_location_address_components
-      - name: location_location_types
-      - name: widget_widgetuserapikey
+      - name: user_sponsor
+
+      # Classroom / membership / invitation tables
+      - name: classroom
+      - name: classroom_invite_code
+      - name: educator_classroom_membership
+      - name: educator_invitation_record
+      - name: learner_classroom_membership
+
+      # Location / geo resolution tables
+      - name: location_address_components
+      - name: location_core
+      - name: location_type
+
+      # Sponsor / invite code tables
+      - name: sponsor_invite_code
