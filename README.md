@@ -1,4 +1,5 @@
 # dbt User 360 Dimension in BigQuery
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
@@ -103,3 +104,13 @@ See [dbt BigQuery docs](https://docs.getdbt.com/docs/core/connect-data-platform/
 
 * dbt Core ≥ 1.8
 * Adapter: `dbt-bigquery`
+
+---
+
+## License
+
+MIT License
+
+Copyright (c) 2025-2026 Corin Stedman (space-lumps)
+
+See the [LICENSE](LICENSE) file for full details.
