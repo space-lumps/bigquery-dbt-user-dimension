@@ -1,1 +1,6 @@
+# This file pins the Python version/environment for pyenv users working in this repo.
+# It is required to run dbt CLI commands locally (e.g. dbt docs generate, dbt compile),
+# even though the project contains no Python code — only SQL models and YAML.
+# dbt is a Python-based tool, so a compatible Python environment is needed on the local machine.
+
 demo_dbt
