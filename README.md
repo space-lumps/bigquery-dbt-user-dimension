@@ -57,12 +57,13 @@ graph TD
 
 ## Model Layers
 
-- **sources** — declared raw tables (generic placeholders)
-- **intermediate** — reusable joins/transforms
-  - `int_locations_clean.sql` — one row per `from_location_id` with best city/state/county/country + coordinates
-  - `int_user_attributions.sql` — unified user ↔ sponsor/site/classroom associations
-- **marts** — BI-ready output
-  - `dim_users.sql` — final table (grain: user_id + optional sponsor_id + site_id)
+This project follows dbt's standard layered architecture:
+
+- **Sources**: Real production tables from the platform (users, locations, attributions), renamed and lightly anonymized for this public repo to remove proprietary naming while preserving realistic structure and relationships.
+- **Intermediates**: Modular transformations for reusable logic:
+  - `int_locations_clean`: Normalizes and deduplicates hierarchical location data, ensuring one best row per `from_location_id`.
+  - `int_user_attributions`: Unifies multi-path attribution logic (classroom, invite, sponsor) into a single, clean association per user.
+- **Marts**: The final `dim_users` model delivers a BI-ready user 360 view with enforced grain (user_id + optional sponsor_id/site_id), full tests, and incremental materialization.
 
 ## Location Resolution Logic
 
