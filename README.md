@@ -1,130 +1,105 @@
-# dbt User 360 Pipeline in BigQuery
+# dbt User 360 Dimension in BigQuery
 
 ## Overview
 
-This project builds a clean, BI‑ready table `user_base` in BigQuery by:
+This dbt project demonstrates a clean, maintainable user 360 dimension (`dim_users`) in BigQuery. It aggregates user identity with resolved location and multi-path attribution (sponsor/site/classroom) from anonymized platform data (professional networking/resource platform connecting career aspirants with field experts).
 
-* Moving complex SQL out of BI and into dbt layers for **consistency, speed, and testability**.
-* Building a robust **location dimension** from component tables and **deduping** per source location to avoid conflicting geographies.
-* Unifying user linkage across roles/routes (learners, educators, invite codes, sites/partners) and preserving users without links via left joins, producing a **clear grain** for dashboards.
-* Documenting lineage with dbt Docs and enforcing quality with dbt tests.
+## Project Background & Evolution
 
-## Warehouse & naming
+These models originated as a single, complex BigQuery SQL script that combined user core data, location resolution, and multi-route attribution in one query.
 
-* **Project:** `oroboro-dw`
-* **Datasets:** `bronze_raw` (sources), `analytics_dev` (models)
-* **dbt source name:** `raw`
+dbt was introduced afterward to improve the workflow by:
+- Extracting location resolution logic into `int_locations_clean` (reusable, testable, easier to maintain)
+- Separating user attribution unification into `int_user_attributions` (handles multiple paths cleanly)
+- Keeping the final `dim_users` mart focused on output shape and grain
+- Adding schema tests, documentation, and materialization control
 
-## Model layers
+This refactor makes the pipeline more modular, debuggable, and scalable while preserving the original business logic.
 
-* **staging**: thin cleans of raw sources
-* **intermediate**: reusable transforms and joins
+### Key goals:
+- Shift complex logic from BI tools into dbt for consistency, speed, and testability.
+- Resolve hierarchical location data with deduplication and prioritization.
+- Unify user associations across routes while preserving unlinked users.
+- Enforce grain, schema tests, and documentation for BI/reporting reliability.
 
-  * `intermediate/locations_clean.sql` — one row per `from_location_id` with `city/county/state/country` + coordinates
-  * `intermediate/stacked_users_partners.sql` — one row per user + partner/site/classroom
-* **marts**: BI‑ready outputs
+## Key Features
 
-  * `marts/user_base.sql` — final table queried by BI
+- Denormalized user dimension with identity + location + attribution context
+- Full daily refresh (small scale <50k rows → no incrementals needed)
+- Intermediate models materialized as tables for performance/debugging
+- Schema tests (not_null, unique combination) and dbt docs support
+- Genericized names and placeholders — no real data or proprietary identifiers
 
-## Data flow
+## Model Layers
 
-```
-bronze_raw (raw sources)
-  ├─ user_user
-  ├─ location_* (components, types, base)
-  └─ (classroom, invites, partners, sites)
+- **sources** — declared raw tables (generic placeholders)
+- **intermediate** — reusable joins/transforms
+  - `int_locations_clean.sql` — one row per `from_location_id` with best city/state/county/country + coordinates
+  - `int_user_attributions.sql` — unified user ↔ sponsor/site/classroom associations
+- **marts** — BI-ready output
+  - `dim_users.sql` — final table (grain: user_id + optional sponsor_id + site_id)
 
-intermediate views
-  ├─ locations_clean               -- unique per from_location_id
-  └─ stacked_users_partners        -- user ↔ partner/site/classroom
+## Location Resolution Logic
 
-mart
-  └─ user_base (table)             -- one row per user_id + partner_id + site_id
-```
+Single `from_location_id` can map to multiple types (city, county, state, country). The pipeline collects candidates, ranks cities (distance + heuristics), picks best per type, and emits one consistent row per source location — preventing ambiguous geography in downstream queries.
 
-## Location dimension — why multi‑step
+## User Attribution Unification
 
-A single `from_location_id` can map to several `to_location_id`s representing different types (city/locality, county, state, country). The pipeline:
+Multiple paths (classroom membership, invitations, sponsor codes) are normalized into a stacked intermediate, then left-joined to user core and locations. Unlinked users preserved for accurate global counts.
 
-1. **Collects candidates** and tags by type.
-2. **Ranks** city candidates (e.g., distance checks, non‑street heuristics).
-3. **Picks one value per type** and emits a single, consistent row per source location.
-   This prevents partial/ambiguous geography from appearing in BI and supports stable filtering and grouping.
+## Materialization Strategy
 
-## User linkage — how it’s unified
+- Intermediates → tables (persist complex transforms, faster downstream reads)
+- Mart (`dim_users`) → table (optimized for BI queries)
 
-Users can be associated via multiple routes (classroom membership, invitations, partner codes, etc.). The pipeline:
+Edit `dbt_project.yml` to change (e.g., to view).
 
-* Normalizes these routes into a **stacked** intermediate with a consistent set of fields.
-* Joins back to `user_user` and the location dimension in the final mart.
-* Preserves users with **no current link** (via left joins) so global user counts remain accurate.
+## Tests & Quality
 
-**Grain of `user_base`:** `(user_id, partner_id, site_id)`.
+`marts/marts_schema.yml` includes:
+- `not_null` on `user_id`
+- `dbt_utils.unique_combination_of_columns` on [user_id, sponsor_id, site_id]
 
-## Materialization strategy
+## Local Execution (Showcase Only)
 
-* `intermediate` models: **views** (lightweight, always reflect raw)
-* `marts.user_base`: **table** (fast dashboards, predictable cost)
+This repo is designed for code review and demonstration. No raw data or live warehouse connection is provided.
 
-Change to a view by editing `dbt_project.yml`:
+- Local `dbt compile`, `dbt debug`, `dbt run`, and `dbt test` are expected to fail on authentication because dummy placeholder credentials are used (no real GCP/BigQuery access is included).
+- This is intentional — the project demonstrates modeling patterns, structure, and best practices, not a runnable pipeline.
+- The underlying logic was validated and executed successfully in BigQuery as a monolithic query before refactoring into dbt models.
+- dbt layers were developed to modularize and improve maintainability; compilation and tests were verified in a controlled environment.
+- For reviewers: inspect the source SQL files directly, review the schema tests, lineage, and comments to understand the logic and design choices.
 
-```yaml
-models:
-  user_base_project:
-    marts:
-      +materialized: view
-```
+To experiment locally (optional):
+1. Enable BigQuery in a GCP project (free tier ok).
+2. Install Google Cloud SDK.
+3. `gcloud auth application-default login`
+4. Copy `profiles.example.yml` → `~/.dbt/profiles.yml`
+5. Update project/dataset with real values.
 
-## Tests
+See [dbt BigQuery docs](https://docs.getdbt.com/docs/core/connect-data-platform/bigquery-setup).
 
-`models/marts/marts_schema.yml` includes:
-
-* `not_null` on `user_id`
-* `dbt_utils.unique_combination_of_columns` on `(user_id, partner_id, site_id)`
-  Will add staging tests (e.g., `unique`/`not_null` on natural keys) as needed.
-
-## Build & run
-
-```bash
-pip install dbt-bigquery
-# Configure ~/.dbt/profiles.yml from profiles.example.yml
-
-dbt deps        # if using packages (dbt_utils)
-dbt debug
-# Build
-dbt run --select intermediate.locations_clean intermediate.stacked_users_partners marts.user_base
-# Test
-dbt test
-# Docs
-dbt docs generate && dbt docs serve
-```
-
-## Metabase usage
-
-* Connect Metabase to dataset `analytics_dev` and query `user_base`.
-* Keep Metabase **dynamic filter** queries using **fully‑qualified names** when Metabase injects SQL. Aliases **inside dbt models** are fine and don’t affect this.
-
-## Repo structure
+## Repo Structure
 
 ```
 .
-├─ dbt_project.yml
-├─ profiles.example.yml
-├─ packages.yml
-├─ macros/
-│  └─ utils.sql
-├─ models/
-│  ├─ sources.yml
-│  ├─ intermediate/
-│  │  ├─ locations_clean.sql
-│  │  └─ stacked_users_partners.sql
-│  └─ marts/
-│     ├─ user_base.sql
-│     └─ marts_schema.yml
-└─ README.md
+├── dbt_project.yml
+├── profiles.example.yml
+├── packages.yml
+├── package-lock.yml
+├── .gitignore
+├── models/
+│   ├── sources.yml
+│   ├── intermediate/
+│   │   ├── int_locations_clean.sql
+│   │   └── int_user_attributions.sql
+│   └── marts/
+│       ├── dim_users.sql
+│       └── marts_schema.yml
+└── README.md
 ```
 
 ## Compatibility
 
-* dbt Core ≥ 1.5
+* dbt Core ≥ 1.8
 * Adapter: `dbt-bigquery`
