@@ -1,5 +1,8 @@
 # dbt User 360 Dimension in BigQuery
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![dbt Core](https://img.shields.io/badge/dbt_Core-≥1.8-orange)](https://docs.getdbt.com/docs/dbt-versions/core-upgrade/Older%20versions)
+[![dbt-bigquery](https://img.shields.io/badge/Adapter-dbt--bigquery-blue)](https://docs.getdbt.com/docs/core/connect-data-platform/bigquery-setup)
+[![Release](https://img.shields.io/github/v/release/space-lumps/bigquery-dbt-user-dimension?color=green)](https://github.com/space-lumps/bigquery-dbt-user-dimension/releases)
 
 ## Overview
 
@@ -60,6 +63,8 @@ Edit `dbt_project.yml` to change (e.g., to view).
 `marts/marts_schema.yml` includes:
 - `not_null` on `user_id`
 - `dbt_utils.unique_combination_of_columns` on [user_id, sponsor_id, site_id]
+
+---
 
 ## Local Execution (Showcase Only)
 
