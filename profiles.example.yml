@@ -1,11 +1,25 @@
-oroboro_dw_profile:
+# profiles.example.yml
+# 
+# Example / template profile for this portfolio showcase project.
+# Uses the recommended OAuth method (no service account key required).
+# dbt compile may fail due to missing credentials during BigQuery adapter initialization — this is expected.
+# The project is designed for code review and demonstration only; real execution requires a GCP project with BigQuery access.
+# Real pipeline ran in a production-like environment (dbt Cloud / Composer).
+
+bigquery_profile:
   target: dev
   outputs:
     dev:
       type: bigquery
-      method: oauth
-      project: oroboro-dw
-      dataset: analytics_dev
-      threads: 4
-      timeout_seconds: 300
-      location: US
+      method: oauth                               # Recommended local method per dbt docs
+      project: sample_user_warehouse              # Placeholder project ID — matches sources.yml
+      dataset: sample_analytics_dev               # Placeholder target schema
+      location: US                                # Default multi-region
+      threads: 4                                  # Reasonable for demo purposes
+
+      # For reviewers who want to test compilation locally (optional):
+      #   1. Install Google Cloud SDK
+      #   2. Run: gcloud auth application-default login
+      #   3. Copy this file to ~/.dbt/profiles.yml
+      #   4. Replace placeholders with real project/dataset values
+      #   5. See: https://docs.getdbt.com/docs/core/connect-data-platform/bigquery-setup

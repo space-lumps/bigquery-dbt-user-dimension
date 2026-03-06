@@ -1,17 +1,35 @@
-name: "user_base_project"
+# dbt_project.yml
+#
+# Portfolio Showcase: BigQuery dbt User 360 Dimension Model
+# ========================================================
+# Purpose:
+#   Demonstrates clean modeling of a denormalized user dimension (dim_users)
+#   with identity, resolved location, and sponsor/site attribution context.
+#   Built from anonymized production patterns — no real data included.
+#
+# Key Design Choices:
+#   - Small scale (< 50k rows) → full daily refresh is simple and efficient
+#   - No incrementals → avoids merge complexity when full rebuild is fast
+#   - Intermediate models as tables → faster downstream reads + easier debugging
+#   - Final mart as table → optimized for BI/reporting queries
+#   - Daily full pipeline refresh (scheduled in production via dbt Cloud/Composer/Airflow)
+
+name: "bigquery_user_dimension"
 version: "1.0.0"
 config-version: 2
-profile: "oroboro_dw_profile"
+profile: "bigquery_profile"
 
 model-paths: ["models"]
 macro-paths: ["macros"]
 
 models:
-  user_base_project:
-    +materialized: view
-    intermediate:
-      +materialized: view
+  bigquery_user_dimension:        # Must match the 'name:' above
+    +materialized: view           # Default fallback
+
+    intermediate:                 # Folder: models/intermediate/
+      +materialized: table        # Build real tables → faster downstream queries
       +tags: ["intermediate"]
-    marts:
-      +materialized: table
+
+    marts:                        # Folder: models/marts/
+      +materialized: table        # Final table → fast queries from BI/reporting tools
       +tags: ["marts"]
