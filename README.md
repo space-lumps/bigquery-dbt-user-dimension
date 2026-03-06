@@ -10,18 +10,17 @@ This dbt project demonstrates a clean, maintainable user 360 dimension (`dim_use
 
 ## Project Background & Evolution
 
-These models originated as a single, complex BigQuery SQL script that combined user core data, location resolution, and multi-route attribution in one query.
+This user dimension started as a single, monolithic SQL query in the BI tool that combined complex location normalization, multi-path attribution logic, and evolving user attributes. While functional for small daily updates (~once per day, capturing new users), the query became increasingly messy and error-prone.
 
-dbt was introduced afterward to improve the workflow by:
-- Extracting location resolution logic into `int_locations_clean` (reusable, testable, easier to maintain)
-- Separating user attribution unification into `int_user_attributions` (handles multiple paths cleanly)
-- Keeping the final `dim_users` mart focused on output shape and grain
-- Adding schema tests, documentation, and materialization control
+### dbt was introduced to address these pain points by refactoring into a layered, modular pipeline:
 
-This refactor makes the pipeline more modular, debuggable, and scalable while preserving the original business logic.
+- **Modularity & maintainability** — Static, rarely-changing logic (location cleaning, attribution unification) lives in dedicated intermediate models, protected from accidental edits during frequent dim_users updates (new columns, categorizations, calculations).
+- **Testability** — Each layer is individually tested (uniqueness, not_null, relationships, custom logic), catching issues early rather than downstream in reports.
+- **Consistency & performance** — Centralized transformations ensure the same clean logic across all consumers; incremental materialization keeps daily refreshes fast and cost-effective in BigQuery.
 
-### Key goals:
-- Shift complex logic from BI tools into dbt for consistency, speed, and testability.
+#### Result: A fragile query became a production-grade, testable, modular pipeline well-suited to a growing user 360 view.
+
+## Key goals:
 - Resolve hierarchical location data with deduplication and prioritization.
 - Unify user associations across routes while preserving unlinked users.
 - Enforce grain, schema tests, and documentation for BI/reporting reliability.
@@ -34,13 +33,17 @@ This refactor makes the pipeline more modular, debuggable, and scalable while pr
 - Schema tests (not_null, unique combination) and dbt docs support
 - Genericized names and placeholders — no real data or proprietary identifiers
 
+---
+
 ## Data Flow
 
 This project follows a standard dbt layered architecture:
 
-- **Sources**: Raw platform tables (users, locations, attributions).
-- **Intermediates**: Clean and transform static/reusable logic (location normalization, multi-path attribution unification).
-- **Marts**: Final BI-ready dimension with enforced grain.
+- **Sources**: Real production tables from the platform (users, locations, attributions), renamed and lightly anonymized for this public repo to remove proprietary naming while preserving realistic structure and relationships.
+- **Intermediates**: Modular transformations for reusable logic:
+  - `int_locations_clean`: Normalizes and deduplicates hierarchical location data, ensuring one best row per `from_location_id`.
+  - `int_user_attributions`: Unifies multi-path attribution logic (classroom, invite, sponsor) into a single, clean association per user.
+- **Marts**: The final `dim_users` model delivers a BI-ready user 360 view with enforced grain (`user_id` + optional `sponsor_id`/`site_id`), full tests, and table materialization.
 
 ```mermaid
 graph TD
@@ -50,24 +53,18 @@ graph TD
     C --> D
     D --> E[BI Tools / Reporting<br>Consistent, testable, fast queries]
 
+    style A fill:#757575,stroke:#424242,stroke-width:2px
     style B fill:#1e88e5,stroke:#0d47a1,stroke-width:2px,color:#fff
     style C fill:#1e88e5,stroke:#0d47a1,stroke-width:2px,color:#fff
     style D fill:#0d47a1,stroke:#003087,stroke-width:4px,color:#fff
+    style E fill:#757575,stroke:#424242,stroke-width:2px
 ```
-
-## Model Layers
-
-This project follows dbt's standard layered architecture:
-
-- **Sources**: Real production tables from the platform (users, locations, attributions), renamed and lightly anonymized for this public repo to remove proprietary naming while preserving realistic structure and relationships.
-- **Intermediates**: Modular transformations for reusable logic:
-  - `int_locations_clean`: Normalizes and deduplicates hierarchical location data, ensuring one best row per `from_location_id`.
-  - `int_user_attributions`: Unifies multi-path attribution logic (classroom, invite, sponsor) into a single, clean association per user.
-- **Marts**: The final `dim_users` model delivers a BI-ready user 360 view with enforced grain (user_id + optional sponsor_id/site_id), full tests, and incremental materialization.
 
 ## Location Resolution Logic
 
-Single `from_location_id` can map to multiple types (city, county, state, country). The pipeline collects candidates, ranks cities (distance + heuristics), picks best per type, and emits one consistent row per source location — preventing ambiguous geography in downstream queries.
+A single `from_location_id` can map to multiple types (city, county, state, country) with potential duplicates or hierarchies. The pipeline collects candidates, ranks cities by distance (e.g., ST_DISTANCE in miles) + heuristics (e.g., regex checks for address-like strings), picks the best per type, and emits one consistent row per source location — preventing ambiguous geography in downstream queries.
+
+This mapping prioritizes the nearest city if within ~10 miles (or if the original locale resembles a suburb/address), grouping users into standardized cities for better BI visualization. For example, scattered suburbs are aggregated under their parent city, enabling accurate mapping and regional analysis without fragmented data points.
 
 ## User Attribution Unification
 
@@ -98,7 +95,7 @@ This repo is designed for code review and demonstration. No raw data or live war
 - dbt layers were developed to modularize and improve maintainability; compilation and tests were verified in a controlled environment.
 - For reviewers: inspect the source SQL files directly, review the schema tests, lineage, and comments to understand the logic and design choices.
 
-To experiment locally (optional):
+### To experiment locally (optional):
 1. Enable BigQuery in a GCP project (free tier ok).
 2. Install Google Cloud SDK.
 3. `gcloud auth application-default login`
