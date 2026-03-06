@@ -1,4 +1,22 @@
-/target/
-/dbt_packages/
-/logs/
+# dbt build artifacts and caches
+target/
+dbt_packages/
+logs/
+partial_parse.msgpack
+
+# Sensitive / personal dbt files (never commit)
+profiles.yml
+.user.yml
+*.key.json
+*.service-account.json
+
+# Editor and OS files
 .DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+*.tmp
