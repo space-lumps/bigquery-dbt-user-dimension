@@ -34,6 +34,27 @@ This refactor makes the pipeline more modular, debuggable, and scalable while pr
 - Schema tests (not_null, unique combination) and dbt docs support
 - Genericized names and placeholders — no real data or proprietary identifiers
 
+## Data Flow
+
+This project follows a standard dbt layered architecture:
+
+- **Sources**: Raw platform tables (users, locations, attributions).
+- **Intermediates**: Clean and transform static/reusable logic (location normalization, multi-path attribution unification).
+- **Marts**: Final BI-ready dimension with enforced grain.
+
+```mermaid
+graph TD
+    A[Raw Sources<br>users, locations, attributions] --> B[int_locations_clean<br>• Normalize & deduplicate hierarchical locations<br>• One best row per from_location_id]
+    A --> C[int_user_attributions<br>• Unify multi-path user associations<br>• Stack classroom/ invite/sponsor paths]
+    B --> D[dim_users<br>• Final user 360 dimension<br>• Grain: user_id + optional sponsor_id/site_id]
+    C --> D
+    D --> E[BI Tools / Reporting<br>Consistent, testable, fast queries]
+
+    style B fill:#1e88e5,stroke:#0d47a1,stroke-width:2px,color:#fff
+    style C fill:#1e88e5,stroke:#0d47a1,stroke-width:2px,color:#fff
+    style D fill:#0d47a1,stroke:#003087,stroke-width:4px,color:#fff
+```
+
 ## Model Layers
 
 - **sources** — declared raw tables (generic placeholders)
