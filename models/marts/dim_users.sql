@@ -1,4 +1,5 @@
 -- models/marts/dim_users.sql
+
 -- Final user dimension model
 -- Combines core user profile, cleaned location attributes, and sponsor/classroom attributions
 -- One row per user (with possible multiple attribution rows denormalized where applicable)
@@ -6,20 +7,20 @@
 -- Base CTE: core user profile from raw source with derived fields
 with users as (
   select
-    user_core.id as user_id
-    ,user_core.uuid
-    ,user_core.first_name
-    ,user_core.last_name
-    ,user_core.email
-    ,user_core.type as user_type
-    ,case when user_core.type = 'E' then 'Educator'
-         when user_core.type = 'CL' then 'Classroom Learner'
-         when user_core.type = 'IL' then 'Independent Learner' end as user_type_name
-    ,case when regexp_replace(lower(trim(user_core.first_name)), r'\s+', '') like '%test%'
-           or regexp_replace(lower(trim(user_core.last_name)), r'\s+', '') like '%test%'
-           or regexp_replace(lower(trim(user_core.email)), r'\s+', '') like '%test%'
-           or user_core.email like 'educatorst1@example.com' then true else false end as is_test_user
-    ,user_core.race_ethnicity as race_ethnicity
+    id as user_id
+    ,uuid
+    ,first_name
+    ,last_name
+    ,email
+    ,type as user_type
+    ,case when type = 'E' then 'Educator'
+         when type = 'CL' then 'Classroom Learner'
+         when type = 'IL' then 'Independent Learner' end as user_type_name
+    ,case when regexp_replace(lower(trim(first_name)), r'\s+', '') like '%test%'
+           or regexp_replace(lower(trim(last_name)), r'\s+', '') like '%test%'
+           or regexp_replace(lower(trim(email)), r'\s+', '') like '%test%'
+           or email like 'educatorst1@example.com' then true else false end as is_test_user
+    ,race_ethnicity
     ,case
       when lower(race_ethnicity) like '%prefer not to say%' or race_ethnicity is null then 'Prefer Not To Say'
       when ( (case when race_ethnicity like '%White%' then 1 else 0 end)
@@ -37,27 +38,27 @@ with users as (
       when race_ethnicity like 'White' then 'White'
       when race_ethnicity like 'Other' then 'Other'
       else 'Other' end as race
-    ,user_core.gender
-    ,user_core.self_describe_gender
+    ,gender
+    ,self_describe_gender
     ,case
-      when user_core.gender like '%Prefer not to say%' or user_core.gender is null then 'Prefer Not To Say'
-      when user_core.gender like '%Prefer to self-describe%' then 'Prefer Not To Say'
-      when user_core.gender like '%Man%' and user_core.gender like '%Woman%' then 'Prefer Not To Say' -- added explicitly to handle spam user input
-      when user_core.gender like '%Man%' then 'Man'
-      when user_core.gender like '%Woman%' then 'Woman'
+      when gender like '%Prefer not to say%' or gender is null then 'Prefer Not To Say'
+      when gender like '%Prefer to self-describe%' then 'Prefer Not To Say'
+      when gender like '%Man%' and gender like '%Woman%' then 'Prefer Not To Say' -- added explicitly to handle spam user input
+      when gender like '%Man%' then 'Man'
+      when gender like '%Woman%' then 'Woman'
       else 'Non-binary' end as gender_sum
-    ,user_core.date_joined
-    ,user_core.is_active
-    ,case when user_core.is_active = false then 'deactivated' else 'active' end as account_status
-    ,user_core.is_staff
+    ,date_joined
+    ,is_active
+    ,case when is_active = false then 'deactivated' else 'active' end as account_status
+    ,is_staff
     ,case
-      when user_core.birthday is null then null
+      when birthday is null then null
       else date_diff(
         current_date,
-        SAFE.PARSE_DATE('%Y-%m-%d', concat(substr(user_core.birthday, 4, 4), '-', substr(user_core.birthday, 1, 2), '-01')),
+        SAFE.PARSE_DATE('%Y-%m-%d', concat(substr(birthday, 4, 4), '-', substr(birthday, 1, 2), '-01')),
         year
-      ) - if(format_date('%m%d', current_date) < concat(substr(user_core.birthday, 1, 2), '01'), 1, 0) end as age
-    ,user_core.location_id
+      ) - if(format_date('%m%d', current_date) < concat(substr(birthday, 1, 2), '01'), 1, 0) end as age
+    ,location_id
   from {{ source('raw','user_core') }}
 )
 -- Enriched final output: one row per user with optional sponsor/classroom/site details
