@@ -33,7 +33,3 @@ __pycache__/
 *.log
 *.tmp
 *.sql.bak
-
-# Optional: dummy data or setup scripts (add if you create them)
-# dummy_data/
-# setup_*.sql
