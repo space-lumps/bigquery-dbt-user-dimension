@@ -4,6 +4,22 @@
 [![dbt-bigquery](https://img.shields.io/badge/Adapter-dbt--bigquery-blue)](https://docs.getdbt.com/docs/core/connect-data-platform/bigquery-setup)
 [![Release](https://img.shields.io/github/v/release/space-lumps/bigquery-dbt-user-dimension?color=green)](https://github.com/space-lumps/bigquery-dbt-user-dimension/releases)
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Why dbt? (Problem → Solution)](#why-dbt-problem--solution)
+- [Data Flow](#data-flow)
+- [Location Resolution Logic](#location-resolution-logic)
+- [User Attribution Unification](#user-attribution-unification)
+- [Materialization Strategy](#materialization-strategy)
+- [Tests & Quality](#tests--quality)
+- [Viewing Documentation (Showcase Mode)](#viewing-documentation-showcase-mode)
+- [Optional: Experiment with a real BigQuery connection](#optional-experiment-with-a-real-bigquery-connection)
+- [Running the Full Pipeline (Requires BigQuery)](#running-the-full-pipeline-requires-bigquery)
+- [Repo Structure](#repo-structure)
+- [Compatibility](#compatibility)
+- [License](#license)
+
 ## Overview
 
 This dbt project builds a clean, testable user 360 dimension (`dim_users`) in BigQuery. It aggregates user identity with resolved hierarchical location data and multi-path attribution (sponsor/site/classroom) from anonymized platform data patterns (professional networking/resource platform).
@@ -79,43 +95,53 @@ Included for zero-setup docs:
 ### Steps to view dbt docs locally:
 1. Make sure you are in the project directory and your Python virtual environment is active (if using one).
 2. Generate the manifest file (parses models, sources, tests, and yml documentation — no credentials needed):
-   `dbt parse`
+```bash
+dbt parse
+```
 3. The repo contains pre-populated `target/catalog.json` with full column details. If you ever need to regenerate or adjust it:
    - Keep the structure and unique_ids matching those in `manifest.json`.
    - Update `metadata.generated_at` to a recent timestamp if desired.
    - The current file includes detailed types and explanatory comments for all sources, intermediate models, and the final mart.
 4. Start the documentation server:
-   `dbt docs serve`
-
+```bash
+dbt docs serve
+```
 Open http://localhost:8080 in your browser. You should see:
 - Full lineage graph
-- Column names + descriptions (from *.yml files)
-- Data types + custom comments (from catalog.json)
+- Column names + descriptions (from `*.yml` files)
+- Data types + custom comments (from `catalog.json`)
 - Model descriptions, tests, and dependencies
 
 If the server fails to start due to "Address already in use":
-`lsof -i :8080`
-`kill -9 <PID>`
+```bash
+lsof -i :8080
+kill -9 <PID>
+```
 then retry:
-`dbt docs serve`
+```bash
+dbt docs serve
+```
 
-### Optional: Experiment with a real BigQuery connection
+### Optional: Experiment with a real BigQuery connection (without dummy data)
 
 If you want to run the full pipeline (compile, run, test, generate real docs):
 
 1. Create a GCP project and enable BigQuery (free tier is sufficient for small data).
 2. Install the Google Cloud SDK.
 3. Authenticate locally:
-   `gcloud auth application-default login`
+```bash
+gcloud auth application-default login
+```
 4. Copy `profiles.example.yml` to `~/.dbt/profiles.yml` and update project and dataset to your own values.
 5. Run standard dbt commands:
-   `dbt debug`               # should say "All checks passed!"
-   `dbt compile`
-   `dbt run`                 # executes models into your real BigQuery dataset
-   `dbt test`
-   `dbt docs generate`       # pulls real column descriptions, etc. from BigQuery
-   `dbt docs serve`          # open http://localhost:8080
-
+```bash
+dbt debug             # should say "All checks passed!"
+dbt compile
+dbt run               # executes models into your real BigQuery dataset
+dbt test
+dbt docs generate     # pulls real column descriptions, etc. from BigQuery
+dbt docs serve        # open http://localhost:8080
+```
 See the official guide: [dbt + BigQuery setup](https://docs.getdbt.com/docs/core/connect-data-platform/bigquery-setup)
 
 ---
@@ -163,7 +189,7 @@ Open http://localhost:8080 to view the full documentation with real metadata.
 
 ## Repo Structure
 
-```
+```text
 .
 ├── dbt_project.yml
 ├── profiles.example.yml
