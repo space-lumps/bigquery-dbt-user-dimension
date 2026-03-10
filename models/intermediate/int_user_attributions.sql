@@ -1,8 +1,10 @@
 -- models/intermediate/int_user_attributions.sql
 --
--- Intermediate model: Aggregates user attribution paths to sponsors, sites, and classrooms
--- Combines multiple enrollment/invitation/join routes into a single user-level view
--- Used downstream in dim_users.sql for the final 360 user profile
+-- Intermediate model: Unifies multiple user attribution paths into one grain
+-- Captures four distinct onboarding/join routes: classroom membership (learner/educator),
+-- classroom invitation (email match), and direct sponsor invite code join.
+-- Output can have multiple rows per user_id (one per attribution path).
+-- Downstream dim_users.sql deduplicates and selects canonical values.
 
 with attributions as (
   -- Route 1: Learners via classroom → site → sponsor
@@ -15,7 +17,7 @@ with attributions as (
     ,user_sponsor.name as sponsor_name
     ,sponsor_invite_code.code as sponsor_code
     ,classroom.id as classroom_id
-    ,classroom.name as classroom_name,
+    ,classroom.name as classroom_name
     ,classroom_invite_code.code as classroom_code
   from {{ source('raw','learner_classroom_membership') }}
   left join {{ source('raw','classroom') }} on classroom.id = learner_classroom_membership.classroom_id
@@ -60,7 +62,9 @@ with attributions as (
     ,classroom.name as classroom_name
     ,classroom_invite_code.code as classroom_code
   from {{ source('raw','educator_invitation_record') }}
-  join {{ source('raw','user_core') }} on lower(trim(user_core.email)) = lower(trim(educator_invitation_record.email)) and user_core.type != 'IL' -- Exclude Independent Learners as they don't use invitations
+  join {{ source('raw','user_core') }} 
+    on lower(trim(user_core.email)) = lower(trim(educator_invitation_record.email)) 
+    and user_core.type != 'IL' -- Exclude Independent Learners as they don't use invitations
   join {{ source('raw','classroom') }} on classroom.id = educator_invitation_record.classroom_id
   left join {{ source('raw','user_site') }} on classroom.site_id = user_site.id
   left join {{ source('raw','user_sponsor') }} on user_site.sponsor_id = user_sponsor.id
@@ -82,13 +86,17 @@ with attributions as (
     ,null as classroom_name
     ,null as classroom_code
   from {{ source('raw','user_join_record') }}
-  join {{ source('raw','user_core') }} on user_core.id = user_join_record.user_id and user_core.type != 'IL' -- Exclude Independent Learners as they don't use invitations
+  join {{ source('raw','user_core') }} 
+    on user_core.id = user_join_record.user_id 
+    and user_core.type != 'IL' -- Exclude Independent Learners
   join {{ source('raw','sponsor_invite_code') }} on user_join_record.sponsor_invite_code_id = sponsor_invite_code.id
   left join {{ source('raw','user_sponsor') }} on sponsor_invite_code.sponsor_id = user_sponsor.id
   left join {{ source('raw','user_site') }} on sponsor_invite_code.site_id = user_site.id
   where user_join_record.action_type = 'userjoins'
 )
-, stacked_users_sponsors as (
+-- Stack educator and learner attributions, deduplicate within each group
+-- GROUP BY acts as a defensive layer to collapse any accidental duplicates from joins
+,stacked_users_sponsors as (
   select
     educator_id as user_id
     ,sponsor_id
@@ -117,9 +125,9 @@ with attributions as (
     ,site_name
   from attributions
   where learner_id is not null
-group by user_id, sponsor_id, sponsor_name, sponsor_code, classroom_id, classroom_name, classroom_code, site_id, site_name)
-;
-
+group by user_id, sponsor_id, sponsor_name, sponsor_code, classroom_id, classroom_name, classroom_code, site_id, site_name
+)
+-- Final output: one or more attribution records per user_id
 select 
     user_id
     ,sponsor_id
