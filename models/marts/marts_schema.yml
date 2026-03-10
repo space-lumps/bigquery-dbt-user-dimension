@@ -1,26 +1,135 @@
 # models/marts/marts_schema.yml
+#
+# Defines schema, column descriptions, and data quality tests for the marts layer.
+# Enables rich, self-documenting dbt docs for the final dimensional model.
+# Descriptions explain purpose and derivation for reviewers.
 
 version: 2
+
 models:
   - name: dim_users
-    description: "One row per user + (optional) sponsor/site with resolved location fields"
+    description: >
+      Denormalized user dimension (Kimball-style type 1 SCD).
+      One row per unique user_id with core profile, derived fields (age, race, gender summary),
+      resolved location hierarchy, and canonical sponsor/site/classroom attribution.
+      Deduplicates source records using most recent date_joined, preferring active accounts.
+      Designed for fast joins to facts or user segmentation analysis.
+
     columns:
       - name: user_id
-        description: "Primary key — unique identifier for each user"
-        tests: [not_null]
-      - name: sponsor_id
-        description: "ID of the sponsoring entity (null if user has no sponsor)"
-      - name: site_id
-        description: "ID of the associated site/location (null if not applicable)"
+        description: Primary key — unique identifier for each user across all sources
+        tests:
+          - not_null
+          - unique
+
+      - name: uuid
+        description: Universally unique record identifier from source system (for traceability)
+
+      - name: first_name
+        description: User's given/first name
+
+      - name: last_name
+        description: User's family/last name
+
+      - name: email
+        description: Primary registered email address (most recent if multiple)
+
+      - name: user_type
+        description: Code for user type ('E' = Educator, 'CL' = Classroom Learner, 'IL' = Independent Learner)
+        tests:
+          - not_null
+
+      - name: user_type_name
+        description: Human-readable user type name derived from user_type code
+
+      - name: is_test_user
+        description: Flag indicating whether the user appears to be a test/dummy account
+
+      - name: race_ethnicity
+        description: Original raw race/ethnicity value(s) from user profile (comma-separated if multi-select)
+
+      - name: race
+        description: Cleaned, simplified race/ethnicity category (e.g., 'Multiracial', 'White', 'Asian', 'Prefer Not To Say')
+
+      - name: gender
+        description: Original raw gender value(s) from user profile (comma-separated if multi-select)
+
+      - name: self_describe_gender
+        description: Free-text gender description when user selected 'prefer to self-describe'
+
+      - name: gender_sum
+        description: Summarized gender category (e.g., 'Man', 'Woman', 'Non-binary', 'Prefer Not To Say')
+
+      - name: date_joined
+        description: Timestamp when the user account was created
+
+      - name: is_active
+        description: Current account active status (true/false)
+
+      - name: account_status
+        description: Derived status label ('active' or 'deactivated')
+
+      - name: is_staff
+        description: Flag indicating staff/admin privileges
+
+      - name: age
+        description: Calculated age in years as of current date (accounting for birthday not yet passed this year)
+
+      - name: location_id
+        description: Original location ID from user_core (links to location hierarchy)
+
       - name: city
-        description: "Resolved city name based on user's most reliable location source"
+        description: Resolved city or most granular location name
+
+      - name: county
+        description: Resolved county name (if available in hierarchy)
+
       - name: state
-        description: "Resolved state/province/region code or name"
+        description: Resolved state/province/region name
+
       - name: country
-        description: "Resolved ISO 3166-1 alpha-2 country code (e.g., 'US', 'CA')"
-    tests:
+        description: Resolved country name
+
+      - name: city_latitude
+        description: Latitude of the resolved city location
+
+      - name: city_longitude
+        description: Longitude of the resolved city location
+
+      - name: sponsor_id
+        description: Canonical sponsor ID associated with the user (if any)
+
+      - name: sponsor_name
+        description: Name of the canonical sponsor (null if none)
+
+      - name: sponsor_code
+        description: Invite code used by the canonical sponsor (if applicable)
+
+      - name: classroom_id
+        description: Canonical classroom ID associated with the user (if any)
+
+      - name: classroom_name
+        description: Name of the canonical classroom
+
+      - name: classroom_code
+        description: Invite code for the canonical classroom (if present)
+
+      - name: site_id
+        description: Canonical site ID associated with the user
+
+      - name: site_name
+        description: Name of the canonical site
+
+    data_tests:
+      # Ensures that every user with a known location_id has at least one resolved geo field
+      # (city or country) — prevents silent NULLs in location reporting
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "city IS NOT NULL OR country IS NOT NULL"
+            where: "location_id IS NOT NULL"
+
+      # Enforces no duplicate rows for the same user + sponsor + site combination
+      # after deduplication — ensures canonical attribution per user context
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [user_id, sponsor_id, site_id]
-            # Ensures no duplicate rows when sponsor/site context is considered
-            # Nested under 'arguments' to comply with dbt >=1.8 deprecation rules

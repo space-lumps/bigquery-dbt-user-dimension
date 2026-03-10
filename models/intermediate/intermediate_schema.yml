@@ -1,0 +1,98 @@
+# models/intermediate/intermediate_schema.yml
+#
+# Defines schema, descriptions, and optional tests for intermediate-layer models.
+# This file enables rich column-level documentation in dbt docs even without a real warehouse connection.
+# Descriptions are written to be self-explanatory for reviewers, explaining purpose and key behaviors.
+# Tests are minimal/generic and focus on data quality invariants.
+version: 2
+
+models:
+  - name: int_locations_clean
+    description: >
+      Cleans and resolves hierarchical location data from raw sources into a flat structure.
+      Starts from user-associated locations (user_core.location_id) and traverses upward
+      through location_address_components to attach parent levels.
+      Each from_location_id (typically a city or admin area) can map to multiple parent
+      to_location_id values (e.g., one city belongs to one county, one state, and one country).
+      The model selects the "best" or most granular match per level and deduplicates to
+      ensure one row per from_location_id. Used in dim_users for accurate geo-enrichment.
+
+    columns:
+      - name: from_location_id
+        description: >
+          The child/original location ID from user_core (the direct location linked to a user).
+          This is the primary key of the model after deduplication.
+          Maps to multiple parent locations (to_location_id) in location_address_components.
+        tests:
+          - not_null
+          - unique
+
+      - name: original_locale
+        description: Original display_name from location_core before any resolution or cleaning
+
+      - name: city
+        description: Resolved city or most granular admin-area name (nearest/best match)
+
+      - name: county
+        description: Resolved county name (if available in the hierarchy)
+
+      - name: state
+        description: Resolved state/province/region name (if distinct from country)
+
+      - name: country
+        description: Resolved country name (top-level parent in hierarchy)
+
+      - name: city_latitude
+        description: Latitude coordinate of the resolved city (from location_core)
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "IS NOT NULL"
+                where: "city IS NOT NULL"
+
+      - name: city_longitude
+        description: Longitude coordinate of the resolved city (from location_core)
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "IS NOT NULL"
+                where: "city IS NOT NULL"
+
+  - name: int_user_attributions
+    description: >
+      Unifies multiple attribution paths for users into a single grain.
+      Stacks four routes: learner classroom membership, educator classroom assignment,
+      classroom email invitation, and direct sponsor invite code join.
+      Produces one or more rows per user_id (multiple attributions are expected).
+      Downstream dim_users deduplicates and selects canonical attribution values.
+      Excludes Independent Learners (type 'IL') from invitation-based paths.
+
+    columns:
+      - name: user_id
+        description: Unique user identifier (primary key in this grain)
+        tests:
+          - not_null
+
+      - name: sponsor_id
+        description: Associated sponsor identifier (if present in any attribution path)
+
+      - name: sponsor_name
+        description: Human-readable name of the associated sponsor
+
+      - name: sponsor_code
+        description: The invite code string used by the sponsor (if applicable)
+
+      - name: classroom_id
+        description: Associated classroom identifier (if attribution came via classroom path)
+
+      - name: classroom_name
+        description: Display name of the associated classroom
+
+      - name: classroom_code
+        description: Invite code for joining the classroom (if present)
+
+      - name: site_id
+        description: Associated site identifier (resolved from classroom or sponsor invite)
+
+      - name: site_name
+        description: Human-readable name of the associated site

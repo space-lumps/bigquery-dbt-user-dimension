@@ -1,33 +1,181 @@
 # models/sources.yml
-# 
+#
 # Declares all raw source tables referenced by the dbt models.
 # Names are fully genericized (no proprietary identifiers) for this portfolio showcase.
 # Real production data is not included or accessible here — this is for demonstration only.
+# Column descriptions are derived directly from usage in downstream models (int_locations_clean, int_user_attributions, dim_users).
 
 version: 2
 
 sources:
   - name: raw
-    database: sample_user_warehouse          # Placeholder BigQuery project ID
-    schema: bronze_raw                       # Placeholder raw layer schema
+    database: dbt-user-dimension-demo    # Placeholder BigQuery project ID -- for Bigquery demo run, replace this with your actual database name
+    schema: bronze_raw
     tables:
       # Core user and identity tables
       - name: user_core
+        description: Primary user profile data including personal details, account status, and demographics
+        columns:
+          - name: id
+            description: Unique user identifier (used as user_id in downstream models)
+            tests:
+              - not_null
+          - name: uuid
+            description: Universally unique identifier for the user record
+          - name: first_name
+            description: User's first/given name
+          - name: last_name
+            description: User's last/family name
+          - name: email
+            description: User's registered email address
+          - name: type
+            description: User type code (IL = Independent Learner, CL = Classroom Learner, E = Educator)
+          - name: race_ethnicity
+            description: User's self-reported race/ethnicity (may include multiple values separated)
+          - name: gender
+            description: User's self-reported gender (may include multiple values or self-description)
+          - name: self_describe_gender
+            description: Free-text field for gender when user selects 'prefer to self-describe'
+          - name: date_joined
+            description: Timestamp when the user account was created
+          - name: is_active
+            description: Boolean indicating whether the account is currently active
+          - name: is_staff
+            description: Boolean indicating staff/admin privileges
+          - name: birthday
+            description: User's date of birth (used to derive age)
+          - name: location_id
+            description: Location identifier linked to user (foreign key linking to location_address_components.from_location_id)
+
       - name: user_join_record
+        description: Audit records of user join actions and events
+        columns:
+          - name: user_id
+            description: Identifier of the user who joined
+          - name: action_type
+            description: Type of join action (e.g., 'userjoins')
+          - name: sponsor_invite_code_id
+            description: Foreign key to the sponsor invite code used (if any)
+
       - name: user_site
+        description: Junction table linking users to associated sites
+        columns:
+          - name: id
+            description: Site identifier
+            tests:
+              - not_null
+              - unique
+          - name: name
+            description: Human-readable name of the site
+          - name: sponsor_id
+            description: Sponsor associated with this site
+
       - name: user_sponsor
+        description: Sponsor entities that users/sites can be associated with
+        columns:
+          - name: id
+            description: Unique sponsor identifier
+            tests:
+              - not_null
+          - name: name
+            description: Name of the sponsor organization or entity
 
       # Classroom / membership / invitation tables
       - name: classroom
+        description: Classroom entities (e.g., courses, groups, cohorts)
+        columns:
+          - name: id
+            description: Unique classroom identifier
+            tests:
+              - not_null
+              - unique
+          - name: name
+            description: Display name of the classroom
+          - name: site_id
+            description: Site to which the classroom belongs
+
       - name: classroom_invite_code
+        description: Unique codes for joining classrooms
+        columns:
+          - name: code
+            description: Invite code string
+            tests:
+              - not_null
+              - unique
+          - name: classroom_id
+            description: Classroom the code belongs to
+
       - name: educator_classroom_membership
+        description: Membership records for educators in classrooms
+        columns:
+          - name: user_id
+            description: Educator's user ID
+          - name: classroom_id
+            description: Classroom the educator is associated with
+
       - name: educator_invitation_record
+        description: Records of invitations sent by educators to potential learners
+        columns:
+          - name: email
+            description: Email address of the invited user
+          - name: classroom_id
+            description: Classroom the invitation is for
+
       - name: learner_classroom_membership
+        description: Membership records for learners in classrooms
+        columns:
+          - name: user_id
+            description: Learner's user ID
+          - name: classroom_id
+            description: Classroom the learner joined
 
       # Location / geo resolution tables
-      - name: location_address_components
       - name: location_core
+        description: Core location master data (IDs, names, coordinates, slugs)
+        columns:
+          - name: id
+            description: Unique location identifier
+            tests:
+              - not_null
+              - unique
+          - name: display_name
+            description: Short, displayable name of the location
+          - name: long_name
+            description: Full, formal name of the location
+          - name: latitude
+            description: Geographic latitude coordinate
+          - name: longitude
+            description: Geographic longitude coordinate
+          - name: slug
+            description: URL-safe identifier for the location
+
+      - name: location_address_components
+        description: Hierarchical component relationships between locations
+        columns:
+          - name: from_location_id
+            description: Parent location identifier
+          - name: to_location_id
+            description: Child/component location identifier
+
       - name: location_type
+        description: Location type classifications
+        columns:
+          - name: location_id
+            description: Location identifier linked to this type (foreign key linking to location_address_components.from_location_id)
+          - name: locationtype_id
+            description: Numeric code for location type (1 = country, 3/4 = city/admin area, 7 = state, 8 = county)
 
       # Sponsor / invite code tables
       - name: sponsor_invite_code
+        description: Invite codes issued by sponsors for user onboarding
+        columns:
+          - name: id
+            description: Unique invite code identifier
+            tests:
+              - not_null
+          - name: code
+            description: The actual invite code string
+          - name: sponsor_id
+            description: Sponsor who issued the code
+          - name: site_id
+            description: Site associated with this invite code
