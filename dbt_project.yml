@@ -24,12 +24,18 @@ macro-paths: ["macros"]
 
 models:
   bigquery_user_dimension:        # Must match the 'name:' above
-    +materialized: view           # Default fallback
+    +materialized: view           # Default fallback for any unmapped models
+    +persist_docs:                # Enable docs persistence for all models in project
+      enabled: true               # This is the 1.11-compatible syntax
 
     intermediate:                 # Folder: models/intermediate/
-      +materialized: table        # Build real tables → faster downstream queries
+      +materialized: table
       +tags: ["intermediate"]
+      +persist_docs:
+        enabled: true
 
     marts:                        # Folder: models/marts/
-      +materialized: table        # Final table → fast queries from BI/reporting tools
+      +materialized: table
       +tags: ["marts"]
+      +persist_docs:
+        enabled: true

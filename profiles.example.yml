@@ -12,7 +12,7 @@ bigquery_profile:
     dev:
       type: bigquery
       method: oauth                               # Recommended local method per dbt docs
-      project: sample_user_warehouse              # Placeholder project ID — matches sources.yml
+      project: dbt-user-dimension-demo            # Placeholder project ID — matches sources.yml
       dataset: sample_analytics_dev               # Placeholder target schema
       location: US                                # Default multi-region
       threads: 4                                  # Reasonable for demo purposes

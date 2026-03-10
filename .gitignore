@@ -1,17 +1,29 @@
 # dbt build artifacts and caches
-target/
+target/*.*
+target/compiled
+target/run
+!target/manifest.json
+!target/catalog.json
 dbt_packages/
 logs/
 partial_parse.msgpack
 
-# Sensitive / personal dbt files (never commit)
+# Sensitive / personal dbt files (never committed)
+~/.dbt/profiles.yml
 profiles.yml
 .user.yml
 *.key.json
 *.service-account.json
 
+# Python / virtualenv
+venv/
+.venv/
+*.pyc
+__pycache__/
+
 # Editor and OS files
 .DS_Store
+._*
 .vscode/
 .idea/
 *.swp
@@ -20,3 +32,8 @@ profiles.yml
 # Logs and temporary files
 *.log
 *.tmp
+*.sql.bak
+
+# Optional: dummy data or setup scripts (add if you create them)
+# dummy_data/
+# setup_*.sql
