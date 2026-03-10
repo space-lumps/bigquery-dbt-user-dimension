@@ -1,87 +1,128 @@
 -- models/marts/dim_users.sql
-
+--
 -- Final user dimension model
 -- Combines core user profile, cleaned location attributes, and sponsor/classroom attributions
--- One row per user (with possible multiple attribution rows denormalized where applicable)
+-- One row per user_id (Kimball dimension best practice: single version of truth)
+-- Deduplicates using most recent date_joined, preferring active accounts and non-null values
 
--- Base CTE: core user profile from raw source with derived fields
-with users as (
-  select
-    id as user_id
+WITH users AS (
+  SELECT
+    id AS user_id
     ,uuid
     ,first_name
     ,last_name
     ,email
-    ,type as user_type
-    ,case when type = 'E' then 'Educator'
-         when type = 'CL' then 'Classroom Learner'
-         when type = 'IL' then 'Independent Learner' end as user_type_name
-    ,case when regexp_replace(lower(trim(first_name)), r'\s+', '') like '%test%'
-           or regexp_replace(lower(trim(last_name)), r'\s+', '') like '%test%'
-           or regexp_replace(lower(trim(email)), r'\s+', '') like '%test%'
-           or email like 'educatorst1@example.com' then true else false end as is_test_user
+    ,type AS user_type
+    -- user_type is a drop down and can only contain 'E','CL', or 'IL', or null
+    ,CASE
+      WHEN type = 'E' THEN 'Educator'
+      WHEN type = 'CL' THEN 'Classroom Learner'
+      WHEN type = 'IL' THEN 'Independent Learner'
+    END AS user_type_name
+    ,CASE
+      WHEN REGEXP_REPLACE(LOWER(TRIM(first_name)), r'\s+', '') LIKE '%test%'
+        OR REGEXP_REPLACE(LOWER(TRIM(last_name)), r'\s+', '') LIKE '%test%'
+        OR REGEXP_REPLACE(LOWER(TRIM(email)), r'\s+', '') LIKE '%test%'
+        OR email LIKE 'educatorst1@example.com' THEN TRUE
+      ELSE FALSE
+    END AS is_test_user
     ,race_ethnicity
-    ,case
-      when lower(race_ethnicity) like '%prefer not to say%' or race_ethnicity is null then 'Prefer Not To Say'
-      when ( (case when race_ethnicity like '%White%' then 1 else 0 end)
-           + (case when race_ethnicity like '%Hispanic%' or race_ethnicity like '%Latinx%' then 1 else 0 end)
-           + (case when race_ethnicity like '%Black%' or race_ethnicity like '%African American%' then 1 else 0 end)
-           + (case when race_ethnicity like '%South Asian%' or race_ethnicity like '%East Asian%' then 1 else 0 end)
-           + (case when race_ethnicity like '%Native Hawaiian or other Pacific Islander%' then 1 else 0 end)
-           + (case when race_ethnicity like '%Native American or Alaska Native' then 1 else 0 end)
-           + (case when race_ethnicity like '%Other%' then 1 else 0 end) ) > 1 then 'Multiracial'
-      when race_ethnicity like 'Hispanic or Latinx' then 'Hispanic'
-      when race_ethnicity like 'Black or African American' then 'Black'
-      when race_ethnicity like '%South Asian%' or race_ethnicity like '%East Asian%' then 'Asian'
-      when race_ethnicity like 'Native Hawaiian or other Pacific Islander' then 'Native Hawaiian or other Pacific Islander'
-      when race_ethnicity like 'Native American or Alaska Native' then 'Native American or Alaska Native'
-      when race_ethnicity like 'White' then 'White'
-      when race_ethnicity like 'Other' then 'Other'
-      else 'Other' end as race
+    -- race_ethnicity is a drop-down so we know what inputs to expect
+    ,CASE
+      WHEN LOWER(race_ethnicity) LIKE '%prefer not to say%' OR race_ethnicity IS NULL THEN 'Prefer Not To Say'
+      WHEN (CASE WHEN race_ethnicity LIKE '%White%' THEN 1 ELSE 0 END +
+           CASE WHEN race_ethnicity LIKE '%Hispanic%' OR race_ethnicity LIKE '%Latinx%' THEN 1 ELSE 0 END +
+           CASE WHEN race_ethnicity LIKE '%Black%' OR race_ethnicity LIKE '%African American%' THEN 1 ELSE 0 END +
+           CASE WHEN race_ethnicity LIKE '%South Asian%' OR race_ethnicity LIKE '%East Asian%' THEN 1 ELSE 0 END +
+           CASE WHEN race_ethnicity LIKE '%Native Hawaiian or other Pacific Islander%' THEN 1 ELSE 0 END +
+           CASE WHEN race_ethnicity LIKE '%Native American or Alaska Native%' THEN 1 ELSE 0 END +
+           CASE WHEN race_ethnicity LIKE '%Other%' THEN 1 ELSE 0 END) > 1 THEN 'Multiracial'
+      WHEN race_ethnicity LIKE 'Hispanic or Latinx' THEN 'Hispanic'
+      WHEN race_ethnicity LIKE 'Black or African American' THEN 'Black'
+      WHEN race_ethnicity LIKE '%South Asian%' OR race_ethnicity LIKE '%East Asian%' THEN 'Asian'
+      WHEN race_ethnicity LIKE 'Native Hawaiian or other Pacific Islander' THEN 'Native Hawaiian or other Pacific Islander'
+      WHEN race_ethnicity LIKE 'Native American or Alaska Native' THEN 'Native American or Alaska Native'
+      WHEN race_ethnicity LIKE 'White' THEN 'White'
+      WHEN race_ethnicity LIKE 'Other' THEN 'Other'
+      ELSE 'Other'
+    END AS race
     ,gender
     ,self_describe_gender
-    ,case
-      when gender like '%Prefer not to say%' or gender is null then 'Prefer Not To Say'
-      when gender like '%Prefer to self-describe%' then 'Prefer Not To Say'
-      when gender like '%Man%' and gender like '%Woman%' then 'Prefer Not To Say' -- added explicitly to handle spam user input
-      when gender like '%Man%' then 'Man'
-      when gender like '%Woman%' then 'Woman'
-      else 'Non-binary' end as gender_sum
+    -- gender is a multi-select drop-down so only contains exact inputs we search for here:
+    ,CASE
+      WHEN gender LIKE 'Prefer not to say' OR gender IS NULL THEN 'Prefer Not To Say'
+      WHEN gender LIKE '%Prefer to self-describe%' THEN 'Non-binary'
+      WHEN gender LIKE '%Man%' AND gender LIKE '%Woman%' THEN 'Non-binary'
+      WHEN gender LIKE 'Non-binary' THEN 'Non-binary'
+      WHEN gender LIKE 'Man' THEN 'Man'
+      WHEN gender LIKE 'Woman' THEN 'Woman'
+      ELSE 'Prefer Not To Say'
+    END AS gender_sum
     ,date_joined
     ,is_active
-    ,case when is_active = false then 'deactivated' else 'active' end as account_status
+    ,CASE WHEN is_active = FALSE THEN 'deactivated' ELSE 'active' END AS account_status
     ,is_staff
-    ,case
-      when birthday is null then null
-      else date_diff(
-        current_date,
-        SAFE.PARSE_DATE('%Y-%m-%d', concat(substr(birthday, 4, 4), '-', substr(birthday, 1, 2), '-01')),
-        year
-      ) - if(format_date('%m%d', current_date) < concat(substr(birthday, 1, 2), '01'), 1, 0) end as age
+    ,CASE
+      WHEN birthday IS NULL THEN NULL
+      ELSE DATE_DIFF(CURRENT_DATE(), birthday, YEAR)
+           - IF(
+               DATE_TRUNC(CURRENT_DATE(), MONTH) < DATE_TRUNC(birthday, MONTH)
+               OR (DATE_TRUNC(CURRENT_DATE(), MONTH) = DATE_TRUNC(birthday, MONTH)
+                   AND EXTRACT(DAY FROM CURRENT_DATE()) < EXTRACT(DAY FROM birthday)),
+               1,
+               0
+             )
+    END AS age
     ,location_id
-  from {{ source('raw','user_core') }}
+  FROM {{ source('raw', 'user_core') }}
 )
--- Enriched final output: one row per user with optional sponsor/classroom/site details
-select
-  users.*
-  ,locations.country
-  ,locations.state
-  ,locations.county
-  ,locations.city
-  ,locations.city_latitude
-  ,locations.city_longitude
-  ,attributions.sponsor_id
-  ,case
-    when users.user_type = 'IL' then null
-    when attributions.sponsor_name is null then null
-    else attributions.sponsor_name end as sponsor_name
-  ,attributions.sponsor_code
-  ,attributions.classroom_id
-  ,attributions.classroom_name
-  ,attributions.classroom_code
-  ,attributions.site_id
-  ,attributions.site_name
-from users
-left join {{ ref('int_user_attributions') }} as attributions on users.user_id = attributions.user_id
-left join {{ ref('int_locations_clean') }} as locations on users.location_id = locations.from_location_id
-order by users.user_id, attributions.sponsor_id, attributions.classroom_id, attributions.site_id asc
+
+-- Join enriched location hierarchy and attributions
+, enriched AS (
+  SELECT
+    users.*
+    ,locations.country
+    ,locations.state
+    ,locations.county
+    ,locations.city
+    ,locations.city_latitude
+    ,locations.city_longitude
+    ,attributions.sponsor_id
+    ,CASE
+      WHEN users.user_type = 'IL' THEN NULL
+      WHEN attributions.sponsor_name IS NULL THEN NULL
+      ELSE attributions.sponsor_name
+    END AS sponsor_name
+    ,attributions.sponsor_code
+    ,attributions.classroom_id
+    ,attributions.classroom_name
+    ,attributions.classroom_code
+    ,attributions.site_id
+    ,attributions.site_name
+  FROM users
+  LEFT JOIN {{ ref('int_locations_clean') }} AS locations
+    ON users.location_id = locations.from_location_id
+  LEFT JOIN {{ ref('int_user_attributions') }} AS attributions
+    ON users.user_id = attributions.user_id
+)
+
+-- Deduplicate to ensure one row per user_id
+-- Priority: most recent join date, then active accounts, then non-null values
+,ranked_users AS (
+  SELECT
+    *
+    ,ROW_NUMBER() OVER (
+      PARTITION BY user_id
+      ORDER BY
+        date_joined DESC NULLS LAST           -- most recent join first
+        ,is_active DESC NULLS LAST            -- prefer active accounts
+        ,email DESC NULLS LAST                -- prefer non-null email
+        ,first_name DESC NULLS LAST           -- tie-breaker
+    ) AS rn
+  FROM enriched
+)
+
+-- Final output: single row per user
+SELECT *
+FROM ranked_users
+WHERE rn = 1
