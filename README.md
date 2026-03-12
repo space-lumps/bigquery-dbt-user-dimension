@@ -133,15 +133,15 @@ If you want to run the full pipeline (compile, run, test, generate real docs):
 gcloud auth application-default login
 ```
 4. Copy `profiles.example.yml` to `~/.dbt/profiles.yml` and update project and dataset to your own values.
-5. Run standard dbt commands:
+5. Run standard dbt commands (limited to non-execution steps):
 ```bash
-dbt debug             # should say "All checks passed!"
+dbt debug               # should say "All checks passed!"
 dbt compile
-dbt run               # executes models into your real BigQuery dataset
-dbt test
-dbt docs generate     # pulls real column descriptions, etc. from BigQuery
-dbt docs serve        # open http://localhost:8080
+dbt docs generate       # pulls metadata from yml files only
+dbt docs serve          # open http://localhost:8080
 ```
+Note: `dbt run` and `dbt test` will fail without source tables in your dataset. To execute the full pipeline, load dummy data first (see next section).
+
 See the official guide: [dbt + BigQuery setup](https://docs.getdbt.com/docs/core/connect-data-platform/bigquery-setup)
 
 ---
@@ -169,6 +169,7 @@ Update `models/sources.yml`:
 
 Set up dbt credentials (one-time):
 Install gcloud SDK if not already installed.
+
 Run:
 ```bash
 gcloud auth application-default login
