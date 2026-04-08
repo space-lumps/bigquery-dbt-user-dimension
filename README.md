@@ -6,19 +6,24 @@
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Why dbt? (Problem → Solution)](#why-dbt-problem--solution)
-- [Data Flow](#data-flow)
-- [Location Resolution Logic](#location-resolution-logic)
-- [User Attribution Unification](#user-attribution-unification)
-- [Materialization Strategy](#materialization-strategy)
-- [Tests & Quality](#tests--quality)
-- [Viewing Documentation (Showcase Mode)](#viewing-documentation-showcase-mode)
-- [Optional: Experiment with a real BigQuery connection](#optional-experiment-with-a-real-bigquery-connection)
-- [Running the Full Pipeline (Requires BigQuery)](#running-the-full-pipeline-requires-bigquery)
-- [Repo Structure](#repo-structure)
-- [Compatibility](#compatibility)
-- [License](#license)
+- [dbt User 360 Dimension in BigQuery](#dbt-user-360-dimension-in-bigquery)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Why dbt? (Problem → Solution)](#why-dbt-problem--solution)
+  - [Data Flow](#data-flow)
+  - [Location Resolution Logic](#location-resolution-logic)
+  - [User Attribution Unification](#user-attribution-unification)
+  - [Materialization Strategy](#materialization-strategy)
+  - [Tests \& Quality](#tests--quality)
+  - [Viewing Documentation (Showcase Mode)](#viewing-documentation-showcase-mode)
+    - [Steps to view dbt docs locally:](#steps-to-view-dbt-docs-locally)
+    - [Optional: Experiment with a real BigQuery connection (without dummy data)](#optional-experiment-with-a-real-bigquery-connection-without-dummy-data)
+    - [Running the Full Pipeline (Requires BigQuery)](#running-the-full-pipeline-requires-bigquery)
+      - [Steps for reviewers:](#steps-for-reviewers)
+      - [In the BigQuery console:](#in-the-bigquery-console)
+  - [Repo Structure](#repo-structure)
+  - [Compatibility](#compatibility)
+  - [License](#license)
 
 ## Overview
 
@@ -43,13 +48,24 @@ Result: Fragile query → production-grade, modular pipeline.
 
 ## Data Flow
 
+<div align="center">
+  <img 
+    src="assets/images/user-360-mermaid.png" 
+    alt="User 360 Mermaid Diagram"
+    width="700">
+</div>
+
+<!-- Mermaid code hidden behind a collapsible section (desktop-friendly) -->
+<details>
+<summary>📊 View editable Mermaid source (desktop recommended)</summary>
+
 ```mermaid
 graph TD
-    A[Raw Sources<br>users, locations, attributions] --> B[int_locations_clean<br>Normalize & deduplicate hierarchy<br>One row per from_location_id]
-    A --> C[int_user_attributions<br>Unify classroom/invite/sponsor paths<br>Multiple rows per user possible]
-    B --> D[dim_users<br>Final user 360 dimension<br>Grain: user_id + optional sponsor/site]
+    A(Raw Sources:<br>users, locations, attributions) --> B(int_locations_clean:<br>Normalize & deduplicate hierarchy<br>One row per from_location_id)
+    A --> C(int_user_attributions:<br>Unify classroom/invite/sponsor paths<br>Multiple rows per user possible)
+    B --> D(dim_users:<br>Final user 360 dimension<br>Grain: user_id + optional sponsor/site)
     C --> D
-    D --> E[BI / Reporting<br>Consistent, testable queries]
+    D --> E(BI / Reporting:<br>Consistent, testable queries)
 
     style A fill:#757575,stroke:#424242
     style B fill:#1e88e5,stroke:#0d47a1,color:#fff
@@ -57,6 +73,7 @@ graph TD
     style D fill:#0d47a1,stroke:#003087,color:#fff
     style E fill:#757575,stroke:#424242
 ```
+</details>
 
 ## Location Resolution Logic
 
